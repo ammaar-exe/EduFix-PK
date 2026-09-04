@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { CheckIcon, ChevronsUpDownIcon } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { CheckIcon, ChevronsUpDownIcon, ClockIcon, LogOutIcon, UserIcon } from "lucide-react";
 
+import { ActivityLogDrawer } from "@/components/activity/ActivityLogDrawer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +23,110 @@ import {
 } from "@/lib/context-guard";
 import { SUBJECTS, isSubjectId, type SubjectId } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
+
+// ---------------------------------------------------------------------------
+// AccountBar — isolated client island for user state + drawer
+// ---------------------------------------------------------------------------
+
+interface AccountBarProps {
+  currentSubject: SubjectId;
+}
+
+function AccountBar({ currentSubject }: AccountBarProps) {
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Persist the last-visited subject so ActivityLogDrawer can redirect correctly.
+  useEffect(() => {
+    try {
+      localStorage.setItem("edufixpk:lastSubject", currentSubject);
+    } catch {
+      // localStorage unavailable — silently ignore.
+    }
+  }, [currentSubject]);
+
+  // Fetch the authenticated user's email once on mount.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { createSupabaseBrowserClient } = await import(
+          "@/lib/supabase/client"
+        );
+        const supabase = createSupabaseBrowserClient();
+        const { data } = await supabase.auth.getUser();
+        setEmail(data.user?.email ?? null);
+      } catch {
+        // Auth fetch failure is non-fatal — account bar stays hidden.
+      }
+    })();
+  }, []);
+
+  async function handleSignOut() {
+    try {
+      const { createSupabaseBrowserClient } = await import(
+        "@/lib/supabase/client"
+      );
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore errors — redirect regardless.
+    }
+    router.push("/login");
+  }
+
+  if (!email) return null;
+
+  // Derive avatar initial from email local-part.
+  const initial = email.charAt(0).toUpperCase();
+
+  return (
+    <>
+      <ActivityLogDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+      {/* My Activity button */}
+      <button
+        type="button"
+        onClick={() => setDrawerOpen(true)}
+        aria-label="My Activity"
+        className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-emerald-600"
+      >
+        <ClockIcon className="size-4" />
+        <span className="hidden sm:inline">Activity</span>
+      </button>
+
+      {/* User menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="Account menu"
+          className="flex size-8 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white ring-2 ring-transparent transition-shadow hover:ring-emerald-300 focus-visible:outline-2 focus-visible:outline-emerald-600"
+        >
+          {initial}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-52">
+          <DropdownMenuLabel className="flex items-center gap-2">
+            <UserIcon className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate text-xs">{email}</span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => setDrawerOpen(true)}>
+            <ClockIcon className="size-4" />
+            My Activity
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={handleSignOut}>
+            <LogOutIcon className="size-4" />
+            Sign Out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Navbar
+// ---------------------------------------------------------------------------
 
 export function Navbar() {
   const pathname = usePathname();
@@ -111,6 +217,9 @@ export function Navbar() {
             );
           })}
         </nav>
+
+        {/* Account bar */}
+        <AccountBar currentSubject={subjectId} />
       </div>
     </header>
   );

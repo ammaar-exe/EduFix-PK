@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { ANSWER_TRANSFER_STORAGE_KEY } from "@/components/answer-assistant/WorkspaceEditor";
 import { EvaluationReport } from "@/components/answer-checker/EvaluationReport";
@@ -10,6 +11,7 @@ import type {
   CheckerApiResponse,
   GradePayload,
 } from "@/lib/answer-checker/types";
+import { logActivity } from "@/lib/supabase/activity";
 
 interface AnswerCheckerStudioProps {
   subjectId: string;
@@ -30,6 +32,7 @@ type Status = "idle" | "loading" | "error" | "success";
  * a later manual visit starts empty.
  */
 export function AnswerCheckerStudio({ subjectId }: AnswerCheckerStudioProps) {
+  const searchParams = useSearchParams();
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [totalMark, setTotalMark] = useState("");
@@ -52,6 +55,46 @@ export function AnswerCheckerStudio({ subjectId }: AnswerCheckerStudioProps) {
       // sessionStorage may be unavailable (private mode) — ignore.
     }
   }, []);
+
+  // Phase B: rehydrate from activityId query param
+  useEffect(() => {
+    const activityId = searchParams.get("activityId");
+    if (!activityId) return;
+
+    (async () => {
+      try {
+        const { createSupabaseBrowserClient } = await import(
+          "@/lib/supabase/client"
+        );
+        const supabase = createSupabaseBrowserClient();
+        const { data, error: fetchError } = await supabase
+          .from("user_activities")
+          .select("prompt_payload, result_payload")
+          .eq("id", activityId)
+          .single();
+
+        if (fetchError || !data) return;
+
+        const prompt = data.prompt_payload as {
+          question?: string;
+          answer?: string;
+          totalMark?: number;
+        } | null;
+        const result = data.result_payload as GradePayload | null;
+
+        if (prompt?.question) setQuestion(prompt.question);
+        if (prompt?.answer) setAnswer(prompt.answer);
+        if (prompt?.totalMark != null)
+          setTotalMark(String(prompt.totalMark));
+        if (result) {
+          setPayload(result);
+          setStatus("success");
+        }
+      } catch {
+        // Rehydration failure must never affect the core generation flow.
+      }
+    })();
+  }, [searchParams]);
 
   async function handleCheck() {
     const trimmedQuestion = question.trim();
@@ -83,6 +126,29 @@ export function AnswerCheckerStudio({ subjectId }: AnswerCheckerStudioProps) {
       }
       setPayload(json.data);
       setStatus("success");
+
+      // Phase A: fire-and-forget activity log — never blocks UI.
+      (async () => {
+        try {
+          const { createSupabaseBrowserClient } = await import(
+            "@/lib/supabase/client"
+          );
+          const supabase = createSupabaseBrowserClient();
+          const { data: userData } = await supabase.auth.getUser();
+          const userId = userData.user?.id;
+          if (!userId) return;
+
+          logActivity({
+            userId,
+            featureType: "answer_checker",
+            title: `Answer Checker — ${trimmedQuestion.slice(0, 60)}${trimmedQuestion.length > 60 ? "…" : ""}`,
+            promptPayload: { question: trimmedQuestion, answer: trimmedAnswer, totalMark: markHint || undefined },
+            resultPayload: json.data,
+          });
+        } catch {
+          // Logging failures are silently ignored.
+        }
+      })();
     } catch (err) {
       setPayload(null);
       setStatus("error");

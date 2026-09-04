@@ -39,6 +39,9 @@ export function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [grade, setGrade] = useState("");
+  const [subjectPreferences, setSubjectPreferences] = useState<string[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [status, setStatus] = useState<Status>(IDLE);
@@ -57,6 +60,7 @@ export function AuthForm() {
     setShowConfirmPassword(false);
     setStatus(IDLE);
   }
+
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,6 +97,13 @@ export function AuthForm() {
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+            grade: grade.trim(),
+            subject_preferences: subjectPreferences,
+          },
+        },
       });
       if (error) throw error;
 
@@ -215,6 +226,42 @@ export function AuthForm() {
           aria-labelledby={isSignIn ? "auth-tab-signin" : "auth-tab-signup"}
           onSubmit={handleSubmit}
         >
+          {!isSignIn && (
+            <>
+              <div className="form-field form-field--name input-span">
+                <label className="form-label label" htmlFor="auth-name">
+                  Full Name
+                </label>
+                <input
+                  className="form-input"
+                  id="auth-name"
+                  name="fullName"
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  placeholder="Ali Khan"
+                />
+              </div>
+
+              <div className="form-field form-field--grade input-span">
+                <label className="form-label label" htmlFor="auth-grade">
+                  Grade / Year
+                </label>
+                <input
+                  className="form-input"
+                  id="auth-grade"
+                  name="grade"
+                  type="text"
+                  required
+                  value={grade}
+                  onChange={(event) => setGrade(event.target.value)}
+                  placeholder="e.g. O-Level, Year 10"
+                />
+              </div>
+            </>
+          )}
+
           <div className="form-field form-field--email input-span">
             <label className="form-label label" htmlFor="auth-email">
               Email address
@@ -263,41 +310,71 @@ export function AuthForm() {
           </div>
 
           {!isSignIn ? (
-            <div className="form-field form-field--confirm-password input-span">
-              <label className="form-label label" htmlFor="auth-confirm-password">
-                Confirm password
-              </label>
-              <div className="password-control">
-                <input
-                  className="form-input password-input"
-                  id="auth-confirm-password"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  required
-                  minLength={MIN_PASSWORD}
-                  value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
-                  placeholder="Re-enter your password"
-                />
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={() => setShowConfirmPassword((value) => !value)}
-                  aria-pressed={showConfirmPassword}
-                  aria-label={
-                    showConfirmPassword ? "Hide password" : "Show password"
-                  }
-                >
-                  {showConfirmPassword ? "Hide" : "Show"}
-                </button>
+            <>
+              <div className="form-field form-field--confirm-password input-span">
+                <label className="form-label label" htmlFor="auth-confirm-password">
+                  Confirm password
+                </label>
+                <div className="password-control">
+                  <input
+                    className="form-input password-input"
+                    id="auth-confirm-password"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    minLength={MIN_PASSWORD}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    placeholder="Re-enter your password"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                    aria-pressed={showConfirmPassword}
+                    aria-label={
+                      showConfirmPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showConfirmPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+                {confirmPassword.length > 0 && !passwordsMatch ? (
+                  <p className="field-error" role="alert">
+                    Passwords do not match.
+                  </p>
+                ) : null}
               </div>
-              {confirmPassword.length > 0 && !passwordsMatch ? (
-                <p className="field-error" role="alert">
-                  Passwords do not match.
-                </p>
-              ) : null}
-            </div>
+
+              <div className="form-field form-field--subjects input-span">
+                <label className="form-label label">Subject Preferences</label>
+                <div className="flex flex-col gap-2 mt-2">
+                  {[
+                    { id: "pak-studies", label: "Pakistan Studies (2059)" },
+                    { id: "islamiyat", label: "Islamiyat (2058)" },
+                    { id: "urdu", label: "Urdu (3248)" },
+                  ].map((subject) => (
+                    <label key={subject.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={subjectPreferences.includes(subject.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSubjectPreferences((prev) => [...prev, subject.id]);
+                          } else {
+                            setSubjectPreferences((prev) =>
+                              prev.filter((id) => id !== subject.id)
+                            );
+                          }
+                        }}
+                      />
+                      <span className="text-sm">{subject.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
           ) : null}
 
           {isSignIn ? (

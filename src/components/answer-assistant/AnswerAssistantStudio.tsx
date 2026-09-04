@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { QuestionPanel } from "@/components/answer-assistant/QuestionPanel";
 import { WorkspaceEditor } from "@/components/answer-assistant/WorkspaceEditor";
@@ -8,6 +9,7 @@ import type {
   AnswerScaffoldPayload,
   AssistantApiResponse,
 } from "@/lib/answer-assistant/types";
+import { logActivity } from "@/lib/supabase/activity";
 
 interface AnswerAssistantStudioProps {
   subjectId: string;
@@ -23,10 +25,44 @@ type Status = "idle" | "loading" | "error" | "success";
  * never be overridden from the client (rules.md §2).
  */
 export function AnswerAssistantStudio({ subjectId }: AnswerAssistantStudioProps) {
+  const searchParams = useSearchParams();
   const [question, setQuestion] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [payload, setPayload] = useState<AnswerScaffoldPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Phase B: rehydrate from activityId query param
+  useEffect(() => {
+    const activityId = searchParams.get("activityId");
+    if (!activityId) return;
+
+    (async () => {
+      try {
+        const { createSupabaseBrowserClient } = await import(
+          "@/lib/supabase/client"
+        );
+        const supabase = createSupabaseBrowserClient();
+        const { data, error: fetchError } = await supabase
+          .from("user_activities")
+          .select("prompt_payload, result_payload")
+          .eq("id", activityId)
+          .single();
+
+        if (fetchError || !data) return;
+
+        const prompt = data.prompt_payload as { question?: string } | null;
+        const result = data.result_payload as AnswerScaffoldPayload | null;
+
+        if (prompt?.question) setQuestion(prompt.question);
+        if (result) {
+          setPayload(result);
+          setStatus("success");
+        }
+      } catch {
+        // Rehydration failure must never affect the core generation flow.
+      }
+    })();
+  }, [searchParams]);
 
   async function analyze() {
     const trimmed = question.trim();
@@ -48,6 +84,29 @@ export function AnswerAssistantStudio({ subjectId }: AnswerAssistantStudioProps)
       }
       setPayload(json.data);
       setStatus("success");
+
+      // Phase A: fire-and-forget activity log — never blocks UI.
+      (async () => {
+        try {
+          const { createSupabaseBrowserClient } = await import(
+            "@/lib/supabase/client"
+          );
+          const supabase = createSupabaseBrowserClient();
+          const { data: userData } = await supabase.auth.getUser();
+          const userId = userData.user?.id;
+          if (!userId) return;
+
+          logActivity({
+            userId,
+            featureType: "answer_assistant",
+            title: `Answer Assistant — ${trimmed.slice(0, 60)}${trimmed.length > 60 ? "…" : ""}`,
+            promptPayload: { question: trimmed },
+            resultPayload: json.data,
+          });
+        } catch {
+          // Logging failures are silently ignored.
+        }
+      })();
     } catch (err) {
       setPayload(null);
       setStatus("error");

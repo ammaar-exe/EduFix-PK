@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { NotesResults } from "@/components/notes/NotesResults";
 import { TopicSelector } from "@/components/notes/TopicSelector";
 import { getTopicOptions, type SubjectTaxonomy } from "@/lib/kb/topics";
 import type { NotesApiResponse, NotesPayload } from "@/lib/notes/types";
+import { logActivity } from "@/lib/supabase/activity";
 
 interface NotesStudioProps {
   subjectId: string;
@@ -42,6 +44,7 @@ export function NotesStudio({
   subjectCode,
   taxonomy,
 }: NotesStudioProps) {
+  const searchParams = useSearchParams();
   const firstPaperId = taxonomy.papers[0]?.id ?? "all";
   const [paperId, setPaperId] = useState<string>(firstPaperId);
   const [topicId, setTopicId] = useState<string>(
@@ -50,6 +53,43 @@ export function NotesStudio({
   const [status, setStatus] = useState<Status>("idle");
   const [result, setResult] = useState<NotesPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Phase B: rehydrate from activityId query param
+  useEffect(() => {
+    const activityId = searchParams.get("activityId");
+    if (!activityId) return;
+
+    (async () => {
+      try {
+        const { createSupabaseBrowserClient } = await import(
+          "@/lib/supabase/client"
+        );
+        const supabase = createSupabaseBrowserClient();
+        const { data, error: fetchError } = await supabase
+          .from("user_activities")
+          .select("prompt_payload, result_payload")
+          .eq("id", activityId)
+          .single();
+
+        if (fetchError || !data) return;
+
+        const prompt = data.prompt_payload as {
+          paperId?: string;
+          topicId?: string;
+        } | null;
+        const result = data.result_payload as NotesPayload | null;
+
+        if (prompt?.paperId) setPaperId(prompt.paperId);
+        if (prompt?.topicId) setTopicId(prompt.topicId);
+        if (result) {
+          setResult(result);
+          setStatus("success");
+        }
+      } catch {
+        // Rehydration failure must never affect the core generation flow.
+      }
+    })();
+  }, [searchParams]);
 
   function handlePaperChange(nextPaperId: string) {
     setPaperId(nextPaperId);
@@ -76,6 +116,33 @@ export function NotesStudio({
       }
       setResult(json.data);
       setStatus("success");
+
+      // Phase A: fire-and-forget activity log — never blocks UI.
+      (async () => {
+        try {
+          const { createSupabaseBrowserClient } = await import(
+            "@/lib/supabase/client"
+          );
+          const supabase = createSupabaseBrowserClient();
+          const { data: userData } = await supabase.auth.getUser();
+          const userId = userData.user?.id;
+          if (!userId) return;
+
+          const topicLabel =
+            getTopicOptions(taxonomy, paperId).find((t) => t.id === topicId)
+              ?.title ?? topicId;
+
+          logActivity({
+            userId,
+            featureType: "notes",
+            title: `Notes — ${topicLabel}`,
+            promptPayload: { paperId, topicId },
+            resultPayload: json.data,
+          });
+        } catch {
+          // Logging failures are silently ignored.
+        }
+      })();
     } catch (err) {
       setResult(null);
       setStatus("error");

@@ -31,9 +31,24 @@ function formatCitation(citation: NoteCitation, index: number): string {
 }
 
 /**
- * Render the payload as clean, copy-friendly text: the generated Markdown notes
- * followed by the retrieved-source list. Falls back to the header + notice when
- * no grounded notes could be produced.
+ * Strip inline citation markers (e.g. [1], [c2], [c12]) and any trailing
+ * whitespace left behind so the exported text is clean.
+ */
+function stripInlineCitations(text: string): string {
+  return text
+    .replace(/\[\d+\]/g, "")
+    .replace(/\[c\d+\]/g, "")
+    .replace(/[ \t]+$/gm, "");
+}
+
+/**
+ * Render the payload as clean, copy-friendly plain text containing ONLY the
+ * generated notes body — no source references, no file-path metadata, no
+ * retrieved_sources arrays. Falls back to the header + notice when no grounded
+ * notes could be produced.
+ *
+ * Both copy-to-clipboard and PDF/print export call this function, so stripping
+ * here keeps all export paths clean without touching UI components.
  */
 export function serialiseNotesToText(payload: NotesPayload): string {
   const lines: string[] = [];
@@ -44,15 +59,10 @@ export function serialiseNotesToText(payload: NotesPayload): string {
     lines.push(`Paper: ${payload.paperCode} • Topic: ${payload.topicLabel}`);
     lines.push("", payload.notice?.trim() || "No grounded notes available.");
   } else {
-    lines.push(markdown);
+    // Strip inline citation markers before exporting.
+    lines.push(stripInlineCitations(markdown));
   }
 
-  if (payload.citations.length > 0) {
-    lines.push("", "---", "", "Sources (retrieved CAIE knowledge base):");
-    payload.citations.forEach((citation, index) => {
-      lines.push(formatCitation(citation, index));
-    });
-  }
-
+  // Sources / citations are intentionally excluded from copy & PDF output.
   return lines.join("\n");
 }
