@@ -14,13 +14,13 @@ export default async function AnswerCheckerPage({
   return (
     <main className="flex flex-1 flex-col gap-6 p-8">
       <header className="space-y-1">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
+        <p className="text-sm font-medium uppercase tracking-wide text-brand-muted">
           Module 3 — CAIE Strict Answer Checker
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl uppercase tracking-tight text-foreground">
           {subjectInfo?.name ?? subject} Answer Checker
         </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           Subject code {subjectInfo?.code ?? "—"}
         </p>
       </header>

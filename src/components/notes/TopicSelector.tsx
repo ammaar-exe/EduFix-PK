@@ -187,12 +187,12 @@ export function TopicSelector({
               type="button"
               onClick={onGenerate}
               disabled={!canGenerate}
-              className="bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {isGenerating ? (
                 <span
                   aria-hidden
-                  className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  className="size-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground"
                 />
               ) : (
                 <SparklesIcon className="size-4" />

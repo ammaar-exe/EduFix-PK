@@ -22,13 +22,13 @@ export default async function NotesPage({ params }: NotesPageProps) {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-8">
       <header className="space-y-1">
-        <p className="text-sm font-medium uppercase tracking-wide text-emerald-700">
+        <p className="text-sm font-medium uppercase tracking-wide text-brand-muted">
           Module 1 — AI Notes Generator
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl uppercase tracking-tight text-foreground">
           {subjectInfo?.name ?? subject} Notes
         </h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           Subject code {subjectInfo?.code ?? "—"}
         </p>
       </header>
@@ -41,7 +41,7 @@ export default async function NotesPage({ params }: NotesPageProps) {
           taxonomy={taxonomy}
         />
       ) : (
-        <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-sm text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
+        <section className="rounded-lg border border-primary/30 bg-brand/10 p-6 text-sm text-foreground">
           No syllabus taxonomy is available for this subject yet. Run{" "}
           <code className="font-mono">npx tsx scripts/derive-topics.ts</code>{" "}
           to regenerate it from the syllabus source files.

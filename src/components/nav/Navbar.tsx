@@ -89,7 +89,7 @@ function AccountBar({ currentSubject }: AccountBarProps) {
         type="button"
         onClick={() => setDrawerOpen(true)}
         aria-label="My Activity"
-        className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-emerald-600"
+        className="flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
       >
         <ClockIcon className="size-4" />
         <span className="hidden sm:inline">Activity</span>
@@ -99,7 +99,7 @@ function AccountBar({ currentSubject }: AccountBarProps) {
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="Account menu"
-          className="flex size-8 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white ring-2 ring-transparent transition-shadow hover:ring-emerald-300 focus-visible:outline-2 focus-visible:outline-emerald-600"
+          className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground ring-2 ring-transparent transition-shadow hover:ring-primary/40 focus-visible:outline-2 focus-visible:outline-primary"
         >
           {initial}
         </DropdownMenuTrigger>
@@ -149,15 +149,21 @@ export function Navbar() {
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
         <Link
           href={`/${subject.id}/${moduleId}`}
-          className="text-base font-semibold tracking-tight text-emerald-700 dark:text-emerald-400"
+          aria-label="EduFix PK home"
+          className="flex shrink-0 items-center gap-2 rounded-md transition-transform duration-200 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-primary"
         >
-          EduFix PK
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/edufix-logo.png"
+            alt="EduFix PK"
+            className="h-9 w-auto"
+          />
         </Link>
 
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label="Switch subject"
-            className="flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-emerald-600"
+            className="flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:outline-primary"
           >
             <span>{subject.name}</span>
             <span className="text-xs text-muted-foreground">{subject.code}</span>
@@ -185,7 +191,7 @@ export function Navbar() {
                       </span>
                     </span>
                     {option.id === subject.id ? (
-                      <CheckIcon className="size-4 text-emerald-600" />
+                      <CheckIcon className="size-4 text-brand-muted" />
                     ) : null}
                   </Link>
                 </DropdownMenuItem>
@@ -208,7 +214,7 @@ export function Navbar() {
                 className={cn(
                   "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
                   active
-                    ? "bg-emerald-600 text-white shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-background hover:text-foreground"
                 )}
               >

@@ -165,6 +165,8 @@ export function AuthForm() {
     <div className="auth-page">
       <div className="auth-card">
         <header className="auth-header">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/edufix-logo.png" alt="EduFix PK" className="auth-logo" />
           <h1 className="auth-title">
             {isSignIn ? "Sign in to EduFix PK" : "Create your EduFix PK account"}
           </h1>
