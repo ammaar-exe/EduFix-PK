@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -29,7 +29,7 @@ interface NotesResultsProps {
   onRegenerate: () => void;
 }
 
-/** Best-effort clipboard write with a legacy fallback for insecure contexts. */
+/** Best-effort clipboard write with legacy fallback. */
 async function copyText(text: string): Promise<boolean> {
   try {
     if (navigator.clipboard?.writeText) {
@@ -37,7 +37,7 @@ async function copyText(text: string): Promise<boolean> {
       return true;
     }
   } catch {
-    // fall through to the legacy path
+    // fall through to legacy path
   }
   try {
     const area = document.createElement("textarea");
@@ -61,25 +61,24 @@ function formatTimestamp(iso: string): string {
   return date.toLocaleString();
 }
 
-/**
- * Tailwind-styled renderers for the generated markdown so the notes match the
- * emerald theme without depending on a typography plugin. Every text node uses
- * dir="auto" so Urdu-script notes render right-to-left inline.
- */
+/** Strips source filenames, footnote markers [1], and citation metadata from text. */
+function stripCitationsAndSources(text: string): string {
+  return (text || "")
+    .replace(/\[c?\d+\]/gi, "")
+    .replace(/\n*### Retrieved [Ss]ources[\s\S]*$/gi, "")
+    .replace(/\n*\* Source:.*$/gm, "")
+    .replace(/\n*Sources:.*$/gm, "")
+    .trim();
+}
+
 const MARKDOWN_COMPONENTS: Components = {
   h1: ({ children }) => (
-    <h1
-      dir="auto"
-      className="mt-1 mb-4 text-2xl font-semibold tracking-tight text-foreground"
-    >
+    <h1 dir="auto" className="mt-1 mb-4 text-2xl font-semibold tracking-tight text-foreground">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2
-      dir="auto"
-      className="mt-7 mb-3 border-b border-border pb-2 text-lg font-semibold text-emerald-700 dark:text-emerald-400"
-    >
+    <h2 dir="auto" className="mt-7 mb-3 border-b border-border pb-2 text-lg font-semibold text-emerald-700 dark:text-emerald-400">
       {children}
     </h2>
   ),
@@ -89,10 +88,7 @@ const MARKDOWN_COMPONENTS: Components = {
     </h3>
   ),
   h4: ({ children }) => (
-    <h4
-      dir="auto"
-      className="mt-4 mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground"
-    >
+    <h4 dir="auto" className="mt-4 mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
       {children}
     </h4>
   ),
@@ -121,21 +117,13 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
   em: ({ children }) => <em className="italic">{children}</em>,
   blockquote: ({ children }) => (
-    <blockquote
-      dir="auto"
-      className="my-3 border-s-2 border-emerald-500 ps-3 text-sm italic text-muted-foreground"
-    >
+    <blockquote dir="auto" className="my-3 border-s-2 border-emerald-500 ps-3 text-sm italic text-muted-foreground">
       {children}
     </blockquote>
   ),
   hr: () => <hr className="my-5 border-border" />,
   a: ({ children, href }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="text-emerald-700 underline underline-offset-2 dark:text-emerald-400"
-    >
+    <a href={href} target="_blank" rel="noreferrer" className="text-emerald-700 underline underline-offset-2 dark:text-emerald-400">
       {children}
     </a>
   ),
@@ -169,21 +157,8 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
 };
 
-/**
- * Req #3 — the retrieved-sources card (and the header source count) is
- * intentionally hidden from the UI. `payload.citations` stays in the state/API
- * payload (untouched); only the visual render nodes are suppressed. Flip to
- * true to restore them.
- */
 const SHOW_RETRIEVED_SOURCES: boolean = false;
 
-/**
- * The generated Notes panel: long-form markdown study notes (CAIE AO1/AO2
- * engine) plus retrieved-source citations, copy-to-clipboard and PDF export.
- *
- * The whole panel is the print root (`#notes-print-area`); interactive chrome is
- * hidden from the exported PDF via Tailwind's `print:hidden` variant.
- */
 export function NotesResults({
   payload,
   isGenerating,
@@ -191,8 +166,15 @@ export function NotesResults({
 }: NotesResultsProps) {
   const [copied, setCopied] = useState(false);
 
+  // Clean markdown for rendering on screen and in PDF exports
+  const cleanedMarkdown = React.useMemo(() => {
+    return stripCitationsAndSources(payload.markdown);
+  }, [payload.markdown]);
+
   async function handleCopy() {
-    const ok = await copyText(serialiseNotesToText(payload));
+    const rawText = serialiseNotesToText(payload);
+    const cleanedText = stripCitationsAndSources(rawText);
+    const ok = await copyText(cleanedText);
     if (!ok) return;
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
@@ -273,7 +255,7 @@ export function NotesResults({
                 remarkPlugins={[remarkGfm]}
                 components={MARKDOWN_COMPONENTS}
               >
-                {payload.markdown}
+                {cleanedMarkdown}
               </ReactMarkdown>
             </div>
           </CardContent>

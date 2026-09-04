@@ -1,5 +1,10 @@
-import Link from "next/link";
+"use client";
 
+import { useState } from "react";
+import Link from "next/link";
+import { ClockIcon } from "lucide-react";
+
+import { ActivityLogDrawer } from "@/components/activity/ActivityLogDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,13 +23,7 @@ import {
 import { SUBJECTS } from "@/lib/subjects";
 
 /**
- * EduFix PK landing page.
- *
- * Replaces the create-next-app boilerplate (which only showed a "Deploy Now"
- * button and "edit page.tsx" placeholder) with the real entry point into the
- * app. Subjects and modules are rendered from the same registries the Navbar
- * and the route guard use (lib/subjects, lib/context-guard) — nothing is
- * hardcoded here (rules.md §2) — and every card links to /{subject}/{module}.
+ * EduFix PK landing page with global Activity Log Drawer integration.
  */
 
 const MODULE_BLURBS: Record<ModuleId, string> = {
@@ -36,9 +35,25 @@ const MODULE_BLURBS: Record<ModuleId, string> = {
 };
 
 export default function Home() {
+  const [activityOpen, setActivityOpen] = useState(false);
+
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-zinc-950">
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-14 px-6 py-16 sm:py-20">
+      {/* Top Action Bar */}
+      <div className="mx-auto flex w-full max-w-6xl justify-end px-6 pt-6">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setActivityOpen(true)}
+          className="gap-2 border-zinc-300 text-xs font-medium hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-900 sm:text-sm"
+        >
+          <ClockIcon className="size-4 text-zinc-500 dark:text-zinc-400" />
+          <span>My Activity</span>
+        </Button>
+      </div>
+
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-14 px-6 pb-16 pt-6 sm:pb-20">
         {/* Hero */}
         <header className="flex flex-col items-start gap-5">
           <Badge variant="secondary" className="px-3 py-1 text-xs">
@@ -80,8 +95,6 @@ export default function Home() {
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
                   {getVisibleModules(subject.id).map((module) => {
-                    // Req #2 — hide the Note Generator for Urdu; highlight each
-                    // subject's default landing module as the primary action.
                     const isPrimary = module.id === getDefaultModule(subject.id);
                     return (
                       <Button
@@ -133,6 +146,12 @@ export default function Home() {
           subject-isolated; no answer is generated without a source.
         </div>
       </footer>
+
+      {/* Activity Log Drawer */}
+      <ActivityLogDrawer
+        open={activityOpen}
+        onClose={() => setActivityOpen(false)}
+      />
     </div>
   );
 }

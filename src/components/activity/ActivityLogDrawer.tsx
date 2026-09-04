@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { ClockIcon, Trash2Icon, XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,7 +22,6 @@ interface ActivityRow {
   created_at: string;
 }
 
-// Navigate to the most-recently-stored subject, falling back to the first known subject.
 const FEATURE_PATH: Record<FeatureType, string> = {
   notes: "notes",
   answer_assistant: "answer-assistant",
@@ -94,16 +94,15 @@ export function ActivityLogDrawer({ open, onClose }: ActivityLogDrawerProps) {
     setLoading(true);
     (async () => {
       try {
-        const { createSupabaseBrowserClient } = await import(
-          "@/lib/supabase/client"
-        );
         const supabase = createSupabaseBrowserClient();
         const { data: userData } = await supabase.auth.getUser();
-        const userId = userData.user?.id;
+        const userId = userData?.user?.id;
+
         if (!userId) {
           setRows([]);
           return;
         }
+
         const { data, error } = await supabase
           .from("user_activities")
           .select("id, feature_type, title, created_at")
@@ -138,9 +137,6 @@ export function ActivityLogDrawer({ open, onClose }: ActivityLogDrawerProps) {
     // Optimistic update
     setRows((prev) => prev.filter((r) => r.id !== id));
     try {
-      const { createSupabaseBrowserClient } = await import(
-        "@/lib/supabase/client"
-      );
       const supabase = createSupabaseBrowserClient();
       const { error } = await supabase
         .from("user_activities")
@@ -239,7 +235,7 @@ export function ActivityLogDrawer({ open, onClose }: ActivityLogDrawerProps) {
                           {formatTimestamp(row.created_at)}
                         </p>
 
-                        {/* Delete button — appears on hover */}
+                        {/* Delete button */}
                         <span
                           role="button"
                           aria-label="Delete activity"
