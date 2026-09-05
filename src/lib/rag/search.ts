@@ -70,7 +70,7 @@ interface MatchKbChunksRow {
   document_id: string;
   subject_id: string;
   content: string;
-  metadata: Record<string, unknown>;
+  metadata: Record<string, unknown> | null;
   similarity: number;
   document_title: string | null;
   document_category: string | null;
@@ -117,8 +117,7 @@ interface RunMatchArgs {
 /**
  * A single match_kb_chunks RPC call plus row mapping, shared by the strict pass
  * and the empty-result fallback so the two stay identical except for their
- * filters, threshold and top_k. Rows below the pass's own threshold are dropped
- * (the RPC already gates on it; this is a defensive re-check).
+ * filters, threshold and top_k.
  */
 async function runMatchKbChunks({
   supabase,
@@ -133,11 +132,11 @@ async function runMatchKbChunks({
     match_subject_id: subjectId,
     match_threshold: threshold,
     match_top_k: topK,
-    match_category: filters.category,
-    match_paper_code: filters.paper_code,
-    match_year: filters.year,
-    match_session: filters.session,
-    match_sub_topic: filters.sub_topic,
+    match_category: filters.category ?? null,
+    match_paper_code: filters.paper_code ?? null,
+    match_year: filters.year ?? null,
+    match_session: filters.session ?? null,
+    match_sub_topic: filters.sub_topic ?? null,
   });
 
   if (error) {
@@ -148,19 +147,31 @@ async function runMatchKbChunks({
 
   return rows
     .filter((row) => Number.isFinite(row.similarity) && row.similarity >= threshold)
-    .map((row) => ({
-      chunk_id: row.chunk_id,
-      document_id: row.document_id,
-      subject_id: row.subject_id,
-      content: row.content,
-      metadata: row.metadata,
-      similarity: row.similarity,
-      document_title: row.document_title,
-      document_category: row.document_category,
-      document_year: row.document_year,
-      document_session: row.document_session,
-      document_paper_code: row.document_paper_code,
-    }));
+    .map((row) => {
+      const meta = row.metadata ?? {};
+      return {
+        chunk_id: row.chunk_id,
+        document_id: row.document_id ?? row.chunk_id,
+        subject_id: row.subject_id,
+        content: row.content,
+        metadata: meta,
+        similarity: row.similarity,
+        document_title:
+          row.document_title ??
+          (meta.filename as string) ??
+          (meta.document_title as string) ??
+          null,
+        document_category:
+          row.document_category ?? (meta.category as string) ?? null,
+        document_year:
+          row.document_year ??
+          (meta.year && !isNaN(Number(meta.year)) ? Number(meta.year) : null),
+        document_session:
+          row.document_session ?? (meta.session as string) ?? null,
+        document_paper_code:
+          row.document_paper_code ?? (meta.paper_code as string) ?? null,
+      };
+    });
 }
 
 export async function searchKnowledgeBase(
@@ -192,8 +203,7 @@ export async function searchKnowledgeBase(
 
   const supabase = createSupabaseAdminClient();
 
-  // Step 1 — strict pass: subject isolation + every metadata filter + the
-  // similarity threshold. This is the normal, precise retrieval path.
+  // Step 1 — strict pass: subject isolation + every metadata filter + threshold
   const strictResults = await runMatchKbChunks({
     supabase,
     queryEmbedding,
@@ -213,15 +223,7 @@ export async function searchKnowledgeBase(
     return strictResults;
   }
 
-  // Step 2 — fallback pass: the strict query returned zero chunks, so re-query
-  // on PURE vector similarity (top 10) with NO metadata filter and no threshold
-  // gate. This guarantees the LLM context engine always receives text chunks
-  // whenever the subject has any embedded content at all.
-  //
-  // NON-NEGOTIABLE: subject isolation (match_subject_id) is STILL enforced — the
-  // fallback never crosses subjects (rules.md §2). Only the category /
-  // paper_code / year / session / sub_topic metadata filters and the similarity
-  // threshold are relaxed.
+  // Step 2 — fallback pass: strict query returned zero chunks
   console.warn(
     `[rag] strict retrieval returned 0 chunks (subject=${subjectId}, ` +
       `threshold=${threshold}, topK=${topK}); falling back to pure vector ` +
@@ -340,13 +342,13 @@ function printUsage(): void {
   npx tsx src/lib/rag/search.ts --subject=<pak-studies|islamiyat|urdu> --query="<text>" [options]
 
 Options:
-  --subject=<subject_id>     Required. One of: ${ALLOWED_SUBJECT_IDS.join(", ")}
-  --query="<text>"           Required. Search query.
-  --category=<category>      Optional metadata filter.
+  --subject=<subject_id>      Required. One of: ${ALLOWED_SUBJECT_IDS.join(", ")}
+  --query="<text>"            Required. Search query.
+  --category=<category>       Optional metadata filter.
   --paper_code=<code>        Optional metadata filter, e.g. 2059/1.
-  --year=<year>              Optional metadata filter, e.g. 2022.
+  --year=<year>               Optional metadata filter, e.g. 2022.
   --session=<session>        Optional metadata filter, e.g. "May/June".
-  --sub_topic=<slug>         Optional hard isolation filter, e.g. battle_of_badr_624ad.
+  --sub_topic=<slug>         Optional hard isolation filter, e.g. plateaus.
   --top=<n>                  Number of results to return. Default: 5. Max: 50.
   --threshold=<0-1>          Cosine similarity threshold. Default: RAG_SIMILARITY_THRESHOLD.
   --help                     Show this help message.
