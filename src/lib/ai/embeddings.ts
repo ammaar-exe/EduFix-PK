@@ -5,8 +5,12 @@ import { getServerEnv } from "@/lib/env";
 /**
  * Embed a batch of texts using Gemini text-embedding-004.
  * Returns one 768-dimensional vector per input text, in input order.
+ * Set taskType to "RETRIEVAL_DOCUMENT" during ingestion and "RETRIEVAL_QUERY" during search.
  */
-export async function embedTexts(texts: string[]): Promise<number[][]> {
+export async function embedTexts(
+  texts: string[],
+  taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY" = "RETRIEVAL_DOCUMENT"
+): Promise<number[][]> {
   if (texts.length === 0) return [];
 
   const env = getServerEnv();
@@ -20,8 +24,8 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
     contents,
     config: {
       // Pin output size so vectors always match kb_chunks.embedding (768).
-      // Gemini models default to larger native sizes (e.g. 3072).
       outputDimensionality: env.EMBEDDING_DIMENSIONS,
+      taskType: taskType,
     },
   });
 
@@ -47,8 +51,8 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   });
 }
 
-/** Embed a single text and return its 768-dimensional vector. */
+/** Embed a single text and return its 768-dimensional vector using RETRIEVAL_QUERY. */
 export async function embedText(text: string): Promise<number[]> {
-  const [vector] = await embedTexts([text]);
+  const [vector] = await embedTexts([text], "RETRIEVAL_QUERY");
   return vector;
 }
